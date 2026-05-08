@@ -1,4 +1,4 @@
-﻿using WindowsInput;
+using WindowsInput;
 using WindowsInput.Native;
 
 namespace Spammer
@@ -59,6 +59,10 @@ namespace Spammer
 
         public RandIntParam rintParam = new("%ri", 1, int.MaxValue);
         public RandFloatParam rfloatParam = new("%rf");
+        public RandCharParam rcharParam = new("%rc");
+        public RandTimeParam rtimeParam = new("%rt");
+        public RandRgbParam rrgbParam = new("%rh");
+        public RandGUIDParam rguidParam = new("%rg");
 
         public MySpammer(string text, int repeatSize, int sleepTime)
         {
@@ -81,7 +85,7 @@ namespace Spammer
         {
             foreach (var entry in Core.Content)
             {
-                Core.OutputEntry(entry, rintParam, rfloatParam);
+                Core.OutputEntry(entry, rintParam, rfloatParam, rcharParam, rtimeParam, rrgbParam, rguidParam);
             }
         }
     }
@@ -113,6 +117,52 @@ namespace Spammer
         public override string Factory(int workingIndex)
         {
             return rng.NextSingle().ToString();
+        }
+    }
+
+    public class RandCharParam : CustomParam
+    {
+        Random rng = new();
+
+        public RandCharParam(string parameter) : base(parameter) { }
+
+        public override string Factory(int workingIndex)
+        {
+            return Convert.ToChar(rng.Next(33, char.MaxValue)).ToString();
+        }
+    }
+
+    public class RandTimeParam : CustomParam
+    {
+        Random rng = new();
+
+        public RandTimeParam(string parameter) : base(parameter) {}
+
+        public override string Factory(int workingIndex)
+        {
+            return new DateTime(rng.NextInt64(DateTime.MinValue.Ticks, DateTime.MaxValue.Ticks)).ToString();
+        }
+    }
+
+    public class RandGUIDParam : CustomParam
+    {
+        public RandGUIDParam(string parameter) : base(parameter) {}
+
+        public override string Factory(int workingIndex)
+        {
+            return Guid.NewGuid().ToString();
+        }
+    }
+
+    public class RandRgbParam : CustomParam
+    {
+        Random rng = new();
+
+        public RandRgbParam(string parameter) : base(parameter) {}
+
+        public override string Factory(int workingIndex)
+        {
+            return $"#{rng.GetHexString(6)}";
         }
     }
 
