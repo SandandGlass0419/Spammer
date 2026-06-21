@@ -1,0 +1,270 @@
+﻿using WindowsInput;
+using WindowsInput.Native;
+
+namespace Spammer
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            MySpammer tool = CreateSpammer(args);
+
+            Console.WriteLine("Waiting 5 sec before starting.");
+            Thread.Sleep(5000);
+
+            tool.Run();
+        }
+
+        static MySpammer CreateSpammer(string[] args)
+        {
+            string filePath;
+            int repeatSize;
+            int sleepTime;
+
+            if (args.Length != 3)
+            {
+                Console.WriteLine("Bad Argument count.");
+                Console.WriteLine($"Format is \"{nameof(filePath)}\" \"{nameof(repeatSize)}\" \"{nameof(sleepTime)}\"");
+                Environment.Exit(1);
+            }
+
+            if (!File.Exists(args[0]))
+            {
+                Console.WriteLine($"File '{args[0]}' doesn't exist.");
+                Environment.Exit(1);
+            }
+
+            filePath = args[0];
+
+            if (!int.TryParse(args[1], out repeatSize))
+            {
+                Console.WriteLine($"'{args[1]}' isn't an int for argument \"{nameof(repeatSize)}\"");
+            }
+
+            if (!int.TryParse(args[2], out sleepTime))
+            {
+                Console.WriteLine($"'{args[2]}' isn't an int for argument \"{nameof(sleepTime)}\"");
+            }
+
+            return new(File.ReadAllText(filePath), repeatSize, sleepTime);
+        }
+    }
+
+    public class MySpammer
+    {
+        public int repeatSize;
+        public int sleepTime;
+
+        public SpammerCore Core;
+
+        public CtrlVParam ctrlVParam = new("%ctrlv");
+
+        public RandIntParam rintParam = new("%ri", 1, int.MaxValue);
+        public RandFloatParam rfloatParam = new("%rf");
+        public RandCharParam rcharParam = new("%rc");
+        public RandTimeParam rtimeParam = new("%rt");
+        public RandRgbParam rrgbParam = new("%rh");
+        public RandGUIDParam rguidParam = new("%rg");
+
+        public MySpammer(string text, int repeatSize, int sleepTime)
+        {
+            this.repeatSize = repeatSize;
+            this.sleepTime = sleepTime;
+            this.Core = new(text);
+        }
+
+        public void Run()
+        {
+            for (int current = 0; current < repeatSize; current++)
+            {
+                OutputText();
+
+                Thread.Sleep(sleepTime);
+            }
+        }
+
+        public void OutputText()
+        {
+            foreach (var entry in Core.Content)
+            {
+                Core.OutputEntry(entry, ctrlVParam, rintParam, rfloatParam, rcharParam, rtimeParam, rrgbParam, rguidParam);
+            }
+        }
+    }
+
+    public class CtrlVParam : CustomParam
+    {
+        public CtrlVParam(string parameter) : base(parameter) { }
+
+        public override string Action(int workingIndex)
+        {
+            isim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.CONTROL, VirtualKeyCode.VK_V);
+
+            return string.Empty;
+        }
+    }
+
+    public class RandIntParam : CustomParam
+    {
+        Random rng = new();
+        public int minValue;
+        public int maxValue;
+
+        public RandIntParam(string parameter, int minValue, int maxValue) : base(parameter)
+        {
+            this.minValue = minValue;
+            this.maxValue = maxValue;
+        }
+
+        public override string Action(int workingIndex)
+        {
+            return rng.Next(minValue, maxValue).ToString();
+        }
+    }
+
+    public class RandFloatParam : CustomParam
+    {
+        Random rng = new();
+
+        public RandFloatParam(string parameter) : base(parameter) { }
+
+        public override string Action(int workingIndex)
+        {
+            return rng.NextSingle().ToString();
+        }
+    }
+
+    public class RandCharParam : CustomParam
+    {
+        Random rng = new();
+
+        public RandCharParam(string parameter) : base(parameter) { }
+
+        public override string Action(int workingIndex)
+        {
+            return Convert.ToChar(rng.Next(33, char.MaxValue)).ToString();
+        }
+    }
+
+    public class RandTimeParam : CustomParam
+    {
+        Random rng = new();
+
+        public RandTimeParam(string parameter) : base(parameter) { }
+
+        public override string Action(int workingIndex)
+        {
+            return new DateTime(rng.NextInt64(DateTime.MinValue.Ticks, DateTime.MaxValue.Ticks)).ToString();
+        }
+    }
+
+    public class RandGUIDParam : CustomParam
+    {
+        public RandGUIDParam(string parameter) : base(parameter) { }
+
+        public override string Action(int workingIndex)
+        {
+            return Guid.NewGuid().ToString();
+        }
+    }
+
+    public class RandRgbParam : CustomParam
+    {
+        Random rng = new();
+
+        public RandRgbParam(string parameter) : base(parameter) { }
+
+        public override string Action(int workingIndex)
+        {
+            return $"#{rng.GetHexString(6)}";
+        }
+    }
+
+    public class SpammerCore
+    {
+        public List<string[]> Content = [];
+
+        InputSimulator Simulator = new();
+
+        public SpammerCore(string text)
+        {
+            LoadText(text);
+        }
+
+        public void LoadText(string text)
+        {
+            foreach (string entry in text.Split('\n'))
+            {
+                Content.Add(entry.Split(@"%n"));
+            }
+        }
+
+        public string[] InsertCustomText(string[] entry, CustomParam customParam)
+        {
+            List<string> result = new();
+
+            int workingIndex = 0;
+            foreach (var line in entry)
+            {
+                string[] splitLines = line.Split(customParam.parameter);
+
+                if (splitLines.Length < 2)
+                {
+                    result.Add(splitLines.First());
+                    continue;
+                }
+
+                string newline = splitLines.First();
+                for (int i = 1; i < splitLines.Length; i++)
+                {
+                    newline += customParam.Action(workingIndex) + splitLines[i];
+                }
+
+                result.Add(newline);
+            }
+
+            return result.ToArray();
+        }
+
+        public string[] ApplyParams(string[] entry, params CustomParam[] customParams)
+        {
+            string[] newentry = entry;
+
+            foreach (var param in customParams)
+            {
+                newentry = InsertCustomText(newentry, param);
+            }
+
+            return newentry;
+        }
+
+        public void OutputEntry(string[] entry, params CustomParam[] customParams)
+        {
+            string[] newentry = ApplyParams(entry, customParams);
+
+            foreach (var line in newentry)
+            {
+                if (!string.IsNullOrEmpty(line))
+                { Simulator.Keyboard.TextEntry(line); }
+
+                Simulator.Keyboard.ModifiedKeyStroke(VirtualKeyCode.SHIFT, VirtualKeyCode.RETURN);
+            }
+
+            Simulator.Keyboard.KeyPress(VirtualKeyCode.BACK);
+            Simulator.Keyboard.KeyPress(VirtualKeyCode.RETURN);
+        }
+    }
+
+    public abstract class CustomParam
+    {
+        public string parameter;
+        public InputSimulator isim = new();
+
+        public CustomParam(string parameter)
+        {
+            this.parameter = parameter;
+        }
+
+        public abstract string Action(int workingIndex);
+    }
+}
