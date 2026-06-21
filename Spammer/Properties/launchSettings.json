@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "Spammer": {
-      "commandName": "Project",
-      "commandLineArgs": "\"C:\\Projects\\Spammer\\content.txt\" 1 0"
-    }
-  }
-}
