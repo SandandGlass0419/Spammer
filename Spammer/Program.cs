@@ -57,50 +57,46 @@ namespace Spammer
 
         public SpammerCore Core;
 
-        public CtrlVParam ctrlVParam = new("%ctrlv");
-
-        public RandIntParam rintParam = new("%ri", 1, int.MaxValue);
-        public RandFloatParam rfloatParam = new("%rf");
-        public RandCharParam rcharParam = new("%rc");
-        public RandTimeParam rtimeParam = new("%rt");
-        public RandRgbParam rrgbParam = new("%rh");
-        public RandGUIDParam rguidParam = new("%rg");
+        public EndLineParam endlParam = new("%endl");
+        public CtrlVParam ctrlvParam = new("%ctrlv");
+        public RandIntParam rintParam = new("%randint");
+        public RandFloatParam rfloatParam = new("%randfloat");
+        public RandTimeParam rtimeParam = new("%randtime");
+        public RandRgbParam rrgbParam = new("%randrgb");
+        public RandGUIDParam rguidParam = new("%randguid");
 
         public MySpammer(string text, int repeatSize, int sleepTime)
         {
             this.repeatSize = repeatSize;
             this.sleepTime = sleepTime;
-            this.Core = new(text);
+            this.Core = new(endlParam, ctrlvParam, rintParam, rfloatParam, rtimeParam, rrgbParam, rguidParam);
+            Core.ParseContent(text);
         }
 
         public void Run()
         {
             for (int current = 0; current < repeatSize; current++)
             {
-                OutputText();
+                Core.OutputContent();
 
                 Thread.Sleep(sleepTime);
             }
         }
+    }
 
-        public void OutputText()
+    public class EndLineParam(string parameter) : CustomParam(parameter)
+    {
+        public override void InvokeAction()
         {
-            foreach (var entry in Core.Content)
-            {
-                Core.OutputEntry(entry, ctrlVParam, rintParam, rfloatParam, rcharParam, rtimeParam, rrgbParam, rguidParam);
-            }
+            Simulator.Keyboard.ModifiedKeyStroke(VirtualKeyCode.SHIFT, VirtualKeyCode.RETURN);
         }
     }
 
-    public class CtrlVParam : CustomParam
+    public class CtrlVParam(string parameter) : CustomParam(parameter)
     {
-        public CtrlVParam(string parameter) : base(parameter) { }
-
-        public override string Action(int workingIndex)
+        public override void InvokeAction()
         {
-            isim.Keyboard.ModifiedKeyStroke(VirtualKeyCode.CONTROL, VirtualKeyCode.VK_V);
-
-            return string.Empty;
+            Simulator.Keyboard.ModifiedKeyStroke(VirtualKeyCode.CONTROL, VirtualKeyCode.VK_V);
         }
     }
 
@@ -110,161 +106,165 @@ namespace Spammer
         public int minValue;
         public int maxValue;
 
-        public RandIntParam(string parameter, int minValue, int maxValue) : base(parameter)
+        public RandIntParam(string parameter, int minValue = int.MinValue, int maxValue = int.MaxValue) : base(parameter)
         {
             this.minValue = minValue;
             this.maxValue = maxValue;
         }
 
-        public override string Action(int workingIndex)
+        public override void InvokeAction()
         {
-            return rng.Next(minValue, maxValue).ToString();
+            Simulator.Keyboard.TextEntry(rng.Next(minValue, maxValue).ToString());
         }
     }
 
-    public class RandFloatParam : CustomParam
+    public class RandFloatParam(string parameter) : CustomParam(parameter)
     {
         Random rng = new();
 
-        public RandFloatParam(string parameter) : base(parameter) { }
-
-        public override string Action(int workingIndex)
+        public override void InvokeAction()
         {
-            return rng.NextSingle().ToString();
+            Simulator.Keyboard.TextEntry(rng.NextSingle().ToString());
         }
     }
 
-    public class RandCharParam : CustomParam
+    public class RandTimeParam(string parameter) : CustomParam(parameter)
     {
         Random rng = new();
 
-        public RandCharParam(string parameter) : base(parameter) { }
-
-        public override string Action(int workingIndex)
+        public override void InvokeAction()
         {
-            return Convert.ToChar(rng.Next(33, char.MaxValue)).ToString();
+            Simulator.Keyboard.TextEntry(new DateTime(rng.NextInt64(DateTime.MinValue.Ticks, DateTime.MaxValue.Ticks)).ToString());
         }
     }
 
-    public class RandTimeParam : CustomParam
+    public class RandGUIDParam(string parameter) : CustomParam(parameter)
+    {
+        public override void InvokeAction()
+        {
+            Simulator.Keyboard.TextEntry(Guid.NewGuid().ToString());
+        }
+    }
+
+    public class RandRgbParam(string parameter) : CustomParam(parameter)
     {
         Random rng = new();
 
-        public RandTimeParam(string parameter) : base(parameter) { }
-
-        public override string Action(int workingIndex)
+        public override void InvokeAction()
         {
-            return new DateTime(rng.NextInt64(DateTime.MinValue.Ticks, DateTime.MaxValue.Ticks)).ToString();
-        }
-    }
-
-    public class RandGUIDParam : CustomParam
-    {
-        public RandGUIDParam(string parameter) : base(parameter) { }
-
-        public override string Action(int workingIndex)
-        {
-            return Guid.NewGuid().ToString();
-        }
-    }
-
-    public class RandRgbParam : CustomParam
-    {
-        Random rng = new();
-
-        public RandRgbParam(string parameter) : base(parameter) { }
-
-        public override string Action(int workingIndex)
-        {
-            return $"#{rng.GetHexString(6)}";
+            Simulator.Keyboard.TextEntry($"#{rng.GetHexString(6)}");
         }
     }
 
     public class SpammerCore
     {
-        public List<string[]> Content = [];
+        public List<string[]> Content = new();
 
         InputSimulator Simulator = new();
 
-        public SpammerCore(string text)
+        public CustomParam[] customParams;
+
+        public SpammerCore(params CustomParam[] customParams)
         {
-            LoadText(text);
+            this.customParams = customParams;
         }
 
-        public void LoadText(string text)
+        public void ParseContent(in string text)
         {
-            foreach (string entry in text.Split('\n'))
+            string[] entries = text.Split('\n');
+
+            foreach (var entry in entries)
             {
-                Content.Add(entry.Split(@"%n"));
+                Content.Add(ParseParams([entry]));
             }
         }
 
-        public string[] InsertCustomText(string[] entry, CustomParam customParam)
+        public string[] ParseParams(string[] entry)
         {
-            List<string> result = new();
-
-            int workingIndex = 0;
-            foreach (var line in entry)
-            {
-                string[] splitLines = line.Split(customParam.parameter);
-
-                if (splitLines.Length < 2)
-                {
-                    result.Add(splitLines.First());
-                    continue;
-                }
-
-                string newline = splitLines.First();
-                for (int i = 1; i < splitLines.Length; i++)
-                {
-                    newline += customParam.Action(workingIndex) + splitLines[i];
-                }
-
-                result.Add(newline);
-            }
-
-            return result.ToArray();
-        }
-
-        public string[] ApplyParams(string[] entry, params CustomParam[] customParams)
-        {
-            string[] newentry = entry;
+            string[] newEntry = entry;
 
             foreach (var param in customParams)
             {
-                newentry = InsertCustomText(newentry, param);
+                newEntry = ParseParam(newEntry, param);
             }
 
-            return newentry;
+            return newEntry;
         }
 
-        public void OutputEntry(string[] entry, params CustomParam[] customParams)
+        public string[] ParseParam(string[] entry, CustomParam param)
         {
-            string[] newentry = ApplyParams(entry, customParams);
+            List<string> parsed = new();
 
-            foreach (var line in newentry)
+            foreach (var phrase in entry)
             {
-                if (!string.IsNullOrEmpty(line))
-                { Simulator.Keyboard.TextEntry(line); }
+                string[] splitPhrase = phrase.Split(param.Parameter);
 
-                Simulator.Keyboard.ModifiedKeyStroke(VirtualKeyCode.SHIFT, VirtualKeyCode.RETURN);
+                parsed.Add(splitPhrase[0]);
+
+                if (splitPhrase.Length < 2) continue;
+
+                for (int i = 1; i < splitPhrase.Length; i++)
+                {
+                    parsed.Add(param.Parameter);
+                    parsed.Add(splitPhrase[i]);
+                }
             }
 
-            Simulator.Keyboard.KeyPress(VirtualKeyCode.BACK);
+            return parsed.ToArray();
+        }
+
+        public void OutputContent()
+        {
+            Content.ForEach(OutputEntry);
+        }
+
+        public void OutputEntry(string[] parsedEntry)
+        {
+            foreach (var phrase in parsedEntry)
+            {
+                if (String.IsNullOrEmpty(phrase)) continue;
+
+                if (CustomParam.IsParam(phrase) && Contains(phrase, out var param))
+                {
+                    param.InvokeAction();
+                }
+
+                else
+                {
+                    Simulator.Keyboard.TextEntry(phrase);
+                }
+            }
+
             Simulator.Keyboard.KeyPress(VirtualKeyCode.RETURN);
+        }
+
+        private bool Contains(string phrase, out CustomParam? param)
+        {
+            param = customParams.FirstOrDefault(p => phrase == p.Parameter);
+
+            return param != null;
         }
     }
 
     public abstract class CustomParam
     {
-        public string parameter;
-        public InputSimulator isim = new();
+        public string Parameter
+        {
+            get;
+            set => field = IsParam(value) ? value : indicator + value;
+        }
+
+        public const char indicator = '%';
+
+        public InputSimulator Simulator = new();
 
         public CustomParam(string parameter)
         {
-            this.parameter = parameter;
+            this.Parameter = parameter;
         }
 
-        public abstract string Action(int workingIndex);
+        public static bool IsParam(string entry) => entry.StartsWith(indicator);
+
+        public abstract void InvokeAction();
     }
 }
