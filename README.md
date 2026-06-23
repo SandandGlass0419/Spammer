@@ -18,7 +18,7 @@ Anything that isn't a parameter will be typed as is. (even if it has a % charact
 * `%rfloat`: Replaces the parameter with a random float.
 * `%rtime`: Replaces the parameter with a random time.
 * `%rrgb`: Replaces the parameter with a random hex code. (starting with #)
-* `%rguid`: Replaces the parameter with a random guid.\
+* `%rguid`: Replaces the parameter with a random guid.
 
 ### Example
 > _content.txt_\
