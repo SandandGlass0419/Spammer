@@ -13,16 +13,17 @@ If you want to add special actions to your spamming content, you can use the fol
 Anything that isn't a parameter will be typed as is. (even if it has a % character)
 * `%endl`: Press Shift + Enter. Use this to add new lines in one entry.
 * `%ctrlv`: Press Ctrl + V. Use this to paste whatever is copied.
-* `%randint`: Replaces the parameter with a random int.
-* `%randfloat`: Replaces the parameter with a random float.
-* `%randtime`: Replaces the parameter with a random time.
-* `%randrgb`: Replaces the parameter with a random hex code. (starting with #)
-* `%randguid`: Replaces the parameter with a random guid.\
+* `%up`: Press Up Arrow. Use this to cycle through past entries. (if it's supported on your spamming environment)
+* `%rint`: Replaces the parameter with a random int.
+* `%rfloat`: Replaces the parameter with a random float.
+* `%rtime`: Replaces the parameter with a random time.
+* `%rrgb`: Replaces the parameter with a random hex code. (starting with #)
+* `%rguid`: Replaces the parameter with a random guid.\
 
 ### Example
 > _content.txt_\
 > Hello,%endlWorld!\
-> This is a random int!: %randint
+> This is a random int!: %rint
 
 cmd: `Spammer content.txt 2 0`\
 Result:
